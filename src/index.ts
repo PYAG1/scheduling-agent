@@ -1,7 +1,8 @@
 import { Hono } from 'hono';
 import { logger } from 'hono/logger';
 import { getCalendarService } from './lib';
-import { menuQAFlow } from './flows';
+import { rancardAgentFlow } from './flows';
+
 
 
 
@@ -73,7 +74,7 @@ app.post('/chat', async (c) => {
       );
     }
 
-    const response = await menuQAFlow(prompt);
+    const response = await  rancardAgentFlow(prompt);
 
     console.log(response);
     return c.json({

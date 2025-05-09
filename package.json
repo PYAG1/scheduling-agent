@@ -6,6 +6,7 @@
   "dependencies": {
     "@genkit-ai/dev-local-vectorstore": "^1.8.0",
     "@genkit-ai/googleai": "^1.8.0",
+    "axios": "^1.9.0",
     "genkit": "^1.8.0",
     "google-auth-library": "^9.15.1",
     "googleapis": "^148.0.0",

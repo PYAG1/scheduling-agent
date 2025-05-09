@@ -5,6 +5,7 @@ import { chunk } from "llm-chunk";
 import * as path from 'path';
 import { ai } from "../lib";
 import { extractTextFromPdf, file, menuPdfIndexer, menuRetriever } from "../utils/pdfUtils";
+import { getUserSchedule } from "../tools";
 
 const chunkingConfig = {
     minLength: 1000,
@@ -46,31 +47,41 @@ export const indexMenu = ai.defineFlow(
   }
 );
 
-export const menuQAFlow = ai.defineFlow(
-  { name: "menuQA", inputSchema: z.string(), outputSchema: z.string() },
+export const rancardAgentFlow = ai.defineFlow(
+  { name: "rancardAgent", inputSchema: z.string(), outputSchema: z.string() },
   async (input: string) => {
-    // retrieve relevant documents
+    // Retrieve relevant documents using RAG
     const docs = await ai.retrieve({
-      retriever: menuRetriever,
+      retriever: menuRetriever, // Replace with your company context retriever if different
       query: input,
       options: { k: 3 },
     });
 
-    // generate a response
+    // Generate a response using the updated prompt
     const { text } = await ai.generate({
       model: googleAI.model('gemini-2.0-flash'),
+        tools: [getUserSchedule],
       prompt: `
-You are acting as a helpful AI assistant that can answer 
-questions about the food available on the menu at Genkit Grub Pub.
+You are a friendly AI assistant for my company, with access to context about my company and its product, Rancard Campaigns. Your role is to engage in a warm, conversational chat with users, answering their questions about my company and its offerings using only the provided context. Do not make up information or add details beyond the context.
 
-Use only the context provided to answer the question.
-If you don't know, do not make up an answer.
-Do not add or change items on the menu.
+When the user sends "hi" or a similar greeting, respond with a friendly welcome and present two options:
 
-Question: ${input}`,
+1. Learn about my company
+2. See how Rancard Campaigns can suit their use case or address their needs.
+3. Book a demo session
+
+If the user selects option 1 or asks about the company, provide relevant information from the RAG context in a conversational tone. If they select option 2 or share details about their company, problem, or use case, explain how Rancard Campaigns can help, tailoring the response to their input and drawing from the RAG context.
+
+In every response to a use case or company-related query, proactively offer to book a live demo session to discuss Rancard Campaigns further. Use the \`getUserSchedule\` tool to fetch the user’s calendar events and recommend an optimal time for the demo. The tool accepts an optional \`duration\` parameter (defaulting to 60 minutes) and returns a recommended time, alternative times, and busy periods. Include the recommended time and up to three alternative times in your response, formatted as a friendly suggestion (e.g., "How about a demo on [recommended time]? Or I can also do [alternative times]."). If the tool fails or no slots are available, politely suggest the user provide a preferred time.
+
+Maintain a friendly, professional tone throughout, and ensure responses are concise yet informative. If the user’s input is unclear, ask clarifying questions to better tailor your response.
+
+User Input: ${input}`,
+
       docs,
     });
 
     return text;
   }
 );
+
