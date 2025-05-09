@@ -7,7 +7,7 @@ import { genkit } from 'genkit';
 export const ai = genkit({
     plugins: [
       googleAI({
-        apiKey: "",
+        apiKey: "YOUR_API_KEY",
       }),
       devLocalVectorstore([
         {
