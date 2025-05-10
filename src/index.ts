@@ -1,6 +1,5 @@
 import { Hono } from 'hono';
 import { logger } from 'hono/logger';
-import { getCalendarService } from './lib';
 import { rancardAgentFlow } from './flows';
 
 
@@ -15,52 +14,8 @@ if (!apiKey) {
 }
 
 
-app.get('/list-events', async (c) => {
-  try {
-    const calendar = await getCalendarService();
-    const eventsResponse = await calendar.events.list({
-      calendarId: 'gyekyeyaw3@gmail.com', 
-      timeMin: new Date().toISOString(),
-      maxResults: 10,
-      singleEvents: true,
-      orderBy: 'startTime',
-    });
-    return c.json( eventsResponse.data.items);
-  } catch (error: any) {
-    console.error('Error listing calendar events:', error);
-    return c.json(
-      {
-        ok: false,
-        error: `Failed to list calendar events: ${error.message}`
-      },
-      500
-    );
-  }
-});
 
-app.post('/create-event', async (c) => {
-  try {
-    const calendar = await getCalendarService();
-    const body = await c.req.json(); // Expect event details in the request body
 
-    const event = await calendar.events.insert({
-      calendarId: 'papayaw.agyemangyekye@rancard.com', 
-      requestBody: body,
-    });
-    console.log('Event created:', event);
-
-    return c.json( event.data);
-  } catch (error: any) {
-    console.error('Error creating calendar event:', error);
-    return c.json(
-      {
-        ok: false,
-        error: `Failed to list calendar events: ${error.message}`
-      },
-      500
-    );
-  }
-});
 app.post('/chat', async (c) => {
   try {
     const { prompt } = await c.req.json();

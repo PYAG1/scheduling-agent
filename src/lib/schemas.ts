@@ -1,24 +1,61 @@
 import { z } from "zod";
 
 export const SearchToolInputSchema = z.object({
-  query: z.string().min(1).describe('The search query provided by the user to find relevant information'),
+  query: z
+    .string()
+    .min(1)
+    .describe(
+      "The search query provided by the user to find relevant information"
+    ),
 });
 
 export const SearchToolOutputSchema = z.object({
-  summary: z.string().describe('A concise summary of the search results tailored to assist in the user chat'),
+  summary: z
+    .string()
+    .describe(
+      "A concise summary of the search results tailored to assist in the user chat"
+    ),
 });
-
 
 export const InputSchema = z.object({
-  duration: z.number().min(15).optional().default(60).describe("Meeting duration in minutes"),
+  duration: z
+    .number()
+    .min(15)
+    .optional()
+    .default(60)
+    .describe("Meeting duration in minutes"),
+});
+
+export const OutputSchema = z.object({
+  recommendedTime: z
+    .string()
+    .datetime()
+    .describe("Recommended meeting time in ISO format"),
+  alternativeTimes: z
+    .array(z.string().datetime())
+    .describe("Alternative meeting times"),
+  busyPeriods: z
+    .array(
+      z.object({
+        start: z.string().datetime(),
+        end: z.string().datetime(),
+      })
+    )
+    .describe("User's busy periods"),
 });
 
 
-export const OutputSchema = z.object({
-  recommendedTime: z.string().datetime().describe("Recommended meeting time in ISO format"),
-  alternativeTimes: z.array(z.string().datetime()).describe("Alternative meeting times"),
-  busyPeriods: z.array(z.object({
-    start: z.string().datetime(),
-    end: z.string().datetime(),
-  })).describe("User's busy periods"),
+export const MeetingSchema = z.object({
+  summary: z.string().min(1, "Summary cannot be empty"),
+  description: z.string().optional(),
+  start: z.string().datetime({ message: "Invalid start date-time format" }),
+  end: z.string().datetime({ message: "Invalid end date-time format" }),
+  attendees: z.array(z.string().email({ message: "Invalid email format in attendees" })).optional(),
+});
+
+export const ScheduleMeetingOutputSchema = z.object({
+  eventId: z.string().optional().describe("The ID of the created calendar event"),
+  htmlLink: z.string().url().optional().describe("A link to the created event in Google Calendar"),
+  status: z.string().describe("Status of the meeting scheduling operation"),
+  message: z.string().optional().describe("Additional message regarding the operation"),
 });

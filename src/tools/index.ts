@@ -1,14 +1,15 @@
-import { z } from "zod";
-import { ai, getCalendarService } from "../lib";
 import axios from "axios";
+import { ai, getCalendarService } from "../lib";
 import {
   InputSchema,
+  MeetingSchema,
   OutputSchema,
+  ScheduleMeetingOutputSchema,
   SearchToolInputSchema,
   SearchToolOutputSchema,
 } from "../lib/schemas";
 
-const getUserSchedule = ai.defineTool(
+export const getUserSchedule = ai.defineTool(
   {
     name: "getUserSchedule",
     description:
@@ -19,8 +20,6 @@ const getUserSchedule = ai.defineTool(
   async (input) => {
     try {
       const calendar = await getCalendarService();
-
-      // Set time range (next 7 days)
       const timeMin = new Date().toISOString();
       const timeMax = new Date(
         Date.now() + 7 * 24 * 60 * 60 * 1000
@@ -140,7 +139,68 @@ export const searchTool = ai.defineTool(
   }
 );
 
-export default searchTool;
+export const scheduleMeetingTool = ai.defineTool(
+  {
+    name: "scheduleMeeting",
+    description:
+      "Schedules a meeting in Google Calendar based on provided details like summary, description, start time, end time, and attendees.",
+    inputSchema: MeetingSchema,
+    outputSchema: ScheduleMeetingOutputSchema,
+  },
+  async (input) => {
+    try {
+      const calendar = await getCalendarService();
+
+      const eventDetails: any = {
+        summary: input.summary,
+        description: input.description,
+        start: {
+          dateTime: input.start,
+        },
+        end: {
+          dateTime: input.end,
+        },
+      };
+
+      if (input.attendees && input.attendees.length > 0) {
+        eventDetails.attendees = input.attendees.map((email) => ({ email }));
+      }
+
+      const eventResponse = await calendar.events.insert({
+        calendarId: "gyekyeyaw3@gmail.com",
+        requestBody: eventDetails,
+        sendNotifications: true,
+      });
+
+      if (eventResponse.data) {
+        return {
+          eventId: eventResponse.data.id ?? undefined,
+          htmlLink: eventResponse.data.htmlLink ?? undefined,
+          status: "success",
+          message: `Meeting "${eventResponse.data.summary}" scheduled successfully.`,
+        };
+      } else {
+        throw new Error("Failed to create event, no data returned from API.");
+      }
+    } catch (error: any) {
+      console.error("Error scheduling meeting:", error);
+      let errorMessage = "Failed to schedule meeting.";
+      if (error.response?.data?.error) {
+        errorMessage += ` Details: ${
+          error.response.data.error.message ?? error.response.data.error
+        }`;
+      } else if (error.message) {
+        errorMessage += ` Details: ${error.message}`;
+      }
+      // It's important to throw an error that Genkit can handle or return a structured error response
+      // For simplicity, we'll throw a new error.
+      // Alternatively, you could return a ScheduleMeetingOutputSchema compliant error object:
+      // return { status: "error", message: errorMessage };
+      throw new Error(errorMessage);
+    }
+  }
+);
+
 // Helper function to find available time slots
 function findAvailableSlots({
   events,
@@ -198,5 +258,3 @@ function findAvailableSlots({
 
   return availableSlots;
 }
-
-export { getUserSchedule };
