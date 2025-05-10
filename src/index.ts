@@ -8,14 +8,6 @@ import { rancardAgentFlow } from './flows';
 const app = new Hono();
 app.use(logger());
 
-const apiKey = process.env.GOOGLE_API_KEY;
-if (!apiKey) {
-  throw new Error('GOOGLE_API_KEY is not set in the environment variables.');
-}
-
-
-
-
 app.post('/chat', async (c) => {
   try {
     const { prompt } = await c.req.json();

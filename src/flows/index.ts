@@ -1,25 +1,16 @@
-import googleAI from "@genkit-ai/googleai";
+import { gemini20Flash } from "@genkit-ai/googleai";
 import { z } from "genkit";
 import { Document } from "genkit/retriever";
 import { chunk } from "llm-chunk";
 import * as path from "path";
-import { ai } from "../lib";
+import { chunkingConfig, menuPdfIndexer, menuRetriever, rancardAgentPrompt } from "../constants";
+import { ai, JsonSessionStore } from "../lib";
+import { getUserSchedule, scheduleMeetingTool, searchTool } from "../tools";
 import {
   extractTextFromPdf,
   file,
-  menuPdfIndexer,
-  menuRetriever,
 } from "../utils/pdfUtils";
-import { getUserSchedule, scheduleMeetingTool, searchTool } from "../tools";
-import { rancardAgentPrompt } from "../constants";
 
-const chunkingConfig = {
-  minLength: 1000,
-  maxLength: 2000,
-  splitter: "sentence",
-  overlap: 100,
-  delimiters: "",
-} as any;
 
 export const indexMenu = ai.defineFlow(
   {
@@ -56,21 +47,32 @@ export const indexMenu = ai.defineFlow(
 export const rancardAgentFlow = ai.defineFlow(
   { name: "rancardAgent", inputSchema: z.string(), outputSchema: z.string() },
   async (input: string) => {
-    const docs = await ai.retrieve({
-      retriever: menuRetriever,
-      query: input,
-      options: { k: 3 },
-    });
+    try {
+      const docs = await ai.retrieve({
+        retriever: menuRetriever,
+        query: input,
+        options: { k: 3 },
+      });
+      
+      const session = ai.createSession({
+        store: new JsonSessionStore(),
+      });
+      
+      const chat = session.chat({
+        store: new JsonSessionStore(),
+        model: gemini20Flash,
+        system: rancardAgentPrompt,
+        tools: [getUserSchedule, searchTool, scheduleMeetingTool],
+        docs,
+      });
 
-    const chat = ai.chat({
-      model: googleAI.model("gemini-2.0-flash"),
-      tools: [getUserSchedule, searchTool, scheduleMeetingTool],
-      docs,
-    });
+      const messageContent = `User Input: ${input}`;
+      const response = await chat.send(messageContent);
 
-    const messageContent = `${rancardAgentPrompt}\nUser Input: ${input}`;
-    const response = await chat.send(messageContent);
-
-    return response.text;
+      return response.text;
+    } catch (error) {
+      console.error("Error in rancardAgentFlow:", error);
+      return "I'm sorry, I encountered an error processing your request. Please try again.";
+    }
   }
 );

@@ -6,6 +6,7 @@ import {
 import * as fs from 'fs';
 import * as path from 'path';
   import { PDFExtract } from 'pdf.js-extract';
+import { indexName } from '../constants';
 
   
 const projectRoot = path.resolve(__dirname, '..');
@@ -13,9 +14,6 @@ const constantsDir = path.join(projectRoot, 'src/constants');
 const pdfFileName = '7a6ab7f1-7c29-4e8b-bdfa-57b4edbef9cb.pdf';
 export const file = path.join(constantsDir, pdfFileName);
 
-export const menuPdfIndexer = devLocalIndexerRef('menuQA');
-
-export const menuRetriever = devLocalRetrieverRef('menuQA');
 
 
 
