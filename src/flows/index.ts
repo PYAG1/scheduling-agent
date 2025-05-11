@@ -45,28 +45,46 @@ export const indexMenu = ai.defineFlow(
 );
 
 export const rancardAgentFlow = ai.defineFlow(
-  { name: "rancardAgent", inputSchema: z.string(), outputSchema: z.string() },
-  async (input: string) => {
+  { 
+    name: "rancardAgent", 
+    inputSchema: z.object({
+      message: z.string(),
+      sessionId: z.string().optional()
+    }),
+    outputSchema: z.string() 
+  },
+  async ({ message, sessionId }) => {
     try {
       const docs = await ai.retrieve({
         retriever: menuRetriever,
-        query: input,
+        query: message,
         options: { k: 3 },
       });
       
-      const session = ai.createSession({
-        store: new JsonSessionStore(),
-      });
+      const store = new JsonSessionStore();
+      
+      // Try to load existing session or create a new one
+      let session;
+      if (sessionId) {
+        try {
+          session = await ai.loadSession(sessionId, { store });
+        } catch (error) {
+          console.log("Failed to load session, creating new one");
+          session = ai.createSession({ store });
+        }
+      } else {
+        session = ai.createSession({ store });
+      }
       
       const chat = session.chat({
-        store: new JsonSessionStore(),
+        store,
         model: gemini20Flash,
         system: rancardAgentPrompt,
         tools: [getUserSchedule, searchTool, scheduleMeetingTool],
         docs,
       });
 
-      const messageContent = `User Input: ${input}`;
+      const messageContent = `User Input: ${message}`;
       const response = await chat.send(messageContent);
 
       return response.text;
