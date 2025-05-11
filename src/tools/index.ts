@@ -8,6 +8,24 @@ import {
   SearchToolInputSchema,
   SearchToolOutputSchema,
 } from "../lib/schemas";
+import { DateTime } from "luxon";
+
+interface GoogleCalendarEvent {
+  start?: { dateTime?: string | null; date?: string | null };
+  end?: { dateTime?: string | null; date?: string | null };
+  summary?: string | null;
+}
+
+interface EventDetails {
+  summary: string;
+  description?: string;
+  start: { dateTime: string };
+  end: { dateTime: string };
+  attendees?: { email: string }[];
+}
+
+const CALENDAR_ID = process.env.CALENDAR_ID;
+const DEFAULT_DURATION = 60;
 
 export const getUserSchedule = ai.defineTool(
   {
@@ -20,14 +38,11 @@ export const getUserSchedule = ai.defineTool(
   async (input) => {
     try {
       const calendar = await getCalendarService();
-      const timeMin = new Date().toISOString();
-      const timeMax = new Date(
-        Date.now() + 7 * 24 * 60 * 60 * 1000
-      ).toISOString();
+      const timeMin = DateTime.now().toUTC().toISO();
+      const timeMax = DateTime.now().plus({ days: 7 }).toUTC().toISO();
 
-      // Fetch calendar events
       const eventsResponse = await calendar.events.list({
-        calendarId: "gyekyeyaw3@gmail.com",
+        calendarId: CALENDAR_ID,
         timeMin,
         timeMax,
         singleEvents: true,
@@ -37,12 +52,13 @@ export const getUserSchedule = ai.defineTool(
 
       const events = eventsResponse.data.items || [];
 
-      // Find available time slots
+      const workingHours = input.workingHours || { start: 9, end: 17 };
       const availableSlots = findAvailableSlots({
         events,
-        duration: input.duration,
-        timeMin: new Date(timeMin),
-        timeMax: new Date(timeMax),
+        duration: input.duration || DEFAULT_DURATION,
+        timeMin: DateTime.fromISO(timeMin),
+        timeMax: DateTime.fromISO(timeMax),
+        workingHours,
       });
 
       // Select best slot and alternatives
@@ -54,87 +70,27 @@ export const getUserSchedule = ai.defineTool(
         end: event.end?.dateTime ?? event.end?.date ?? "",
       }));
 
+      const validAlternativeTimes = alternativeTimes
+        .filter((slot) => slot.isValid)
+        .map((slot) => slot.toISO()!);
+
       return {
-        recommendedTime:
-          recommendedTime?.toISOString() || new Date(timeMin).toISOString(),
-        alternativeTimes: alternativeTimes.map((slot) => slot.toISOString()),
+        recommendedTime: recommendedTime?.isValid
+          ? recommendedTime.toISO()!
+          : DateTime.fromISO(timeMin).toISO()!,
+        alternativeTimes: validAlternativeTimes,
         busyPeriods,
       };
     } catch (error: any) {
-      throw new Error(`Failed to fetch schedule: ${error.message}`);
-    }
-  }
-);
-
-// Define the search and summarize tool
-export const searchTool = ai.defineTool(
-  {
-    name: "searchAndSummarize",
-    description:
-      "Searches the internet for information and provides a concise summary to assist in user chats",
-    inputSchema: SearchToolInputSchema,
-    outputSchema: SearchToolOutputSchema,
-  },
-  async (input) => {
-    try {
-      // Validate the query
-      if (!input.query.trim()) {
-        throw new Error("Search query cannot be empty");
-      }
-
-      // Perform the search using Google Custom Search API
-      const response = await axios.get(
-        "https://www.googleapis.com/customsearch/v1",
-        {
-          params: {
-            key: process.env.JSON_SEARCH_API_KEY,
-            cx: process.env.JSON_SEARCH_ENGINE_ID,
-            q: input.query,
-          },
-        }
-      );
-
-      // Extract search results
-      const items = response.data.items ?? [];
-      if (items.length === 0) {
-        return { summary: "No relevant search results found for the query." };
-      }
-
-      // Combine titles and snippets for richer context
-      const searchContent = items
-        .map(
-          (item: { title: string; snippet: string }) =>
-            `${item.title}: ${item.snippet}`
-        )
-        .join("\n");
-
-      // Generate a summary using a refined prompt
-      const { text } = await ai.generate({
-        prompt: `
-          You are assisting in a chat with a user who asked for information related to "${input.query}".
-          Summarize the following search results in a concise, clear, and conversational manner.
-          Focus on the most relevant and useful information to help the user, avoiding technical jargon or redundant details.
-          If the results contain conflicting information, highlight the most credible points.
-          Provide the summary in 2-3 sentences, tailored to the user's likely intent in a chat context.
-
-          Search results:
-          ${searchContent}
-        `,
-      });
-
-      return { summary: text };
-    } catch (error) {
+      console.error("Error in getUserSchedule:", error);
       if (axios.isAxiosError(error)) {
         throw new Error(
-          `Failed to fetch search results: ${
-            error.response?.data?.error?.message ?? error.message
-          }`
+          `API error: ${error.response?.data?.message || error.message}`
         );
       }
-      if (error instanceof Error) {
-        throw new Error(`Search and summarize failed: ${error.message}`);
-      }
-      throw new Error("Search and summarize failed: Unknown error");
+      throw new Error(
+        `Failed to fetch schedule: ${error.message || String(error)}`
+      );
     }
   }
 );
@@ -143,7 +99,7 @@ export const scheduleMeetingTool = ai.defineTool(
   {
     name: "scheduleMeeting",
     description:
-      "Schedules a meeting in Google Calendar based on provided details like summary, description, start time, end time, and attendees.",
+      "Schedules a meeting in Google Calendar based on provided details like summary, description, start time, optional end time, and attendees.",
     inputSchema: MeetingSchema,
     outputSchema: ScheduleMeetingOutputSchema,
   },
@@ -151,23 +107,40 @@ export const scheduleMeetingTool = ai.defineTool(
     try {
       const calendar = await getCalendarService();
 
-      const eventDetails: any = {
-        summary: input.summary,
-        description: input.description,
-        start: {
-          dateTime: input.start,
-        },
-        end: {
-          dateTime: input.end,
-        },
-      };
+      // Validate start and end times
+      const start = DateTime.fromISO(input.start);
+      let end = input.end
+        ? DateTime.fromISO(input.end)
+        : start.plus({ minutes: DEFAULT_DURATION });
 
-      if (input.attendees && input.attendees.length > 0) {
-        eventDetails.attendees = input.attendees.map((email) => ({ email }));
+      if (!start.isValid || !end.isValid) {
+        throw new Error("Invalid start or end time format");
+      }
+      if (start >= end) {
+        throw new Error("Start time must be before end time");
       }
 
+      if (input.attendees) {
+        const invalidEmails = input.attendees.filter(
+          (email) => !/^\S+@\S+\.\S+$/.test(email)
+        );
+        if (invalidEmails.length > 0) {
+          throw new Error(
+            `Invalid attendee email(s): ${invalidEmails.join(", ")}`
+          );
+        }
+      }
+
+      const eventDetails: EventDetails = {
+        summary: input.summary,
+        description: input.description,
+        start: { dateTime: start.toISO() },
+        end: { dateTime: end.toISO() },
+        attendees: input.attendees?.map((email) => ({ email })),
+      };
+
       const eventResponse = await calendar.events.insert({
-        calendarId: "gyekyeyaw3@gmail.com",
+        calendarId: CALENDAR_ID,
         requestBody: eventDetails,
         sendNotifications: true,
       });
@@ -184,76 +157,125 @@ export const scheduleMeetingTool = ai.defineTool(
       }
     } catch (error: any) {
       console.error("Error scheduling meeting:", error);
-      let errorMessage = "Failed to schedule meeting.";
-      if (error.response?.data?.error) {
-        errorMessage += ` Details: ${
-          error.response.data.error.message ?? error.response.data.error
-        }`;
-      } else if (error.message) {
-        errorMessage += ` Details: ${error.message}`;
-      }
-      // It's important to throw an error that Genkit can handle or return a structured error response
-      // For simplicity, we'll throw a new error.
-      // Alternatively, you could return a ScheduleMeetingOutputSchema compliant error object:
-      // return { status: "error", message: errorMessage };
-      throw new Error(errorMessage);
+      throw new Error(`Failed to schedule meeting: ${error.message}`);
     }
   }
 );
 
-// Helper function to find available time slots
+
+export const searchTool = ai.defineTool(
+  {
+    name: "searchAndSummarize",
+    description:
+      "Searches the internet for information and provides a concise summary to assist in user chats",
+    inputSchema: SearchToolInputSchema,
+    outputSchema: SearchToolOutputSchema,
+  },
+  async (input) => {
+    try {
+      const query = input.query.trim();
+      if (!query) {
+        throw new Error("Search query cannot be empty or just whitespace");
+      }
+
+      // Perform the search using Google Custom Search API
+      const response = await axios.get(
+        "https://www.googleapis.com/customsearch/v1",
+        {
+          params: {
+            key: process.env.JSON_SEARCH_API_KEY,
+            cx: process.env.JSON_SEARCH_ENGINE_ID,
+            q: query,
+          },
+        }
+      );
+
+      const items = response.data.items ?? [];
+      if (items.length === 0) {
+        return { summary: "No relevant search results found for the query." };
+      }
+
+      const searchContent = items
+        .map(
+          (item: { title: string; snippet: string }) =>
+            `${item.title}: ${item.snippet}`
+        )
+        .join("\n");
+
+      const { text } = await ai.generate({
+        prompt: `
+          You are assisting in a chat with a user who asked for information related to "${query}".
+          Summarize the following search results in a concise, clear, and conversational manner.
+          Focus on the most relevant and useful information to help the user, avoiding technical jargon or redundant details.
+          If the results contain conflicting information, highlight the most credible points.
+          Provide the summary in 2-3 sentences, tailored to the user's likely intent in a chat context.
+
+          Search results:
+          ${searchContent}
+        `,
+      });
+
+      return { summary: text };
+    } catch (error: any) {
+      console.error("Error in searchTool:", error);
+      if (axios.isAxiosError(error)) {
+        throw new Error(
+          `API error: ${error.response?.data?.error?.message || error.message}`
+        );
+      }
+      throw new Error(
+        `Search and summarize failed: ${error.message || String(error)}`
+      );
+    }
+  }
+);
+
+// Optimized helper function to find available time slots by finding gaps between events
 function findAvailableSlots({
   events,
   duration,
   timeMin,
   timeMax,
+  workingHours,
 }: {
-  events: any[];
+  events: GoogleCalendarEvent[];
   duration: number;
-  timeMin: Date;
-  timeMax: Date;
+  timeMin: DateTime;
+  timeMax: DateTime;
+  workingHours: { start: number; end: number };
 }) {
-  // Working hours (9 AM - 5 PM)
-  const WORKING_HOURS = { start: 9, end: 17 };
+  const availableSlots: DateTime[] = [];
+  const sortedEvents = events
+    .map((event) => ({
+      start: DateTime.fromISO(event.start?.dateTime ?? event.start?.date ?? ""),
+      end: DateTime.fromISO(event.end?.dateTime ?? event.end?.date ?? ""),
+    }))
+    .sort((a, b) => a.start.toMillis() - b.start.toMillis());
 
-  const availableSlots: Date[] = [];
-  let currentTime = new Date(timeMin); //04/10/2024 12:00:00 AM 10/04/2024 12:00:00 AM
+  let currentTime = timeMin.startOf("day").plus({ hours: workingHours.start });
 
   while (currentTime < timeMax) {
-    const dayStart = new Date(currentTime);
-    dayStart.setHours(WORKING_HOURS.start, 0, 0, 0);
-    const dayEnd = new Date(currentTime);
-    dayEnd.setHours(WORKING_HOURS.end, 0, 0, 0);
+    const dayEnd = currentTime.endOf("day").set({ hour: workingHours.end });
 
-    // Skip if outside working hours
-    if (currentTime < dayStart) {
-      currentTime = dayStart;
+    // Find the next event that overlaps with the current time
+    const nextEvent = sortedEvents.find((event) => event.start > currentTime);
+
+    let slotEnd = nextEvent ? nextEvent.start : dayEnd;
+
+    // Check if there's enough time for the meeting
+    if (slotEnd.diff(currentTime, "minutes").minutes >= duration) {
+      availableSlots.push(currentTime);
     }
 
+    // Move to the end of the next event or the end of the day
+    currentTime = nextEvent ? nextEvent.end : dayEnd;
+
+    // If we've reached the end of the day, move to the next day
     if (currentTime >= dayEnd) {
-      currentTime.setDate(currentTime.getDate() + 1);
-      currentTime.setHours(WORKING_HOURS.start, 0, 0, 0);
-      continue;
+      currentTime = currentTime
+        .plus({ days: 1 })
+        .set({ hour: workingHours.start });
     }
-
-    // Check if slot is free
-    const slotEnd = new Date(currentTime.getTime() + duration * 60 * 1000);
-    const isFree = !events.some((event) => {
-      const eventStart = new Date(event.start?.dateTime ?? event.start?.date);
-      const eventEnd = new Date(event.end?.dateTime ?? event.end?.date);
-      return (
-        (currentTime >= eventStart && currentTime < eventEnd) ||
-        (slotEnd > eventStart && slotEnd <= eventEnd) ||
-        (currentTime <= eventStart && slotEnd >= eventEnd)
-      );
-    });
-
-    if (isFree) {
-      availableSlots.push(new Date(currentTime));
-    }
-
-    // Move to next 30-minute slot
-    currentTime = new Date(currentTime.getTime() + 30 * 60 * 1000);
   }
 
   return availableSlots;

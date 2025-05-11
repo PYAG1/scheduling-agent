@@ -24,6 +24,13 @@ export const InputSchema = z.object({
     .optional()
     .default(60)
     .describe("Meeting duration in minutes"),
+  workingHours: z
+    .object({
+      start: z.number().min(0).max(23),
+      end: z.number().min(0).max(23),
+    })
+    .optional()
+    .describe("Working hours start and end (24-hour format)"),
 });
 
 export const OutputSchema = z.object({
