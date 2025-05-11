@@ -1,7 +1,8 @@
 import { devLocalIndexerRef, devLocalRetrieverRef } from "@genkit-ai/dev-local-vectorstore";
 import { SplitOptions } from "llm-chunk";
+import path = require("path");
 
-export const rancardAgentPrompt = `
+export const AGENT_PROMPT = `
 You are a friendly AI assistant for my company, with access to context about my company and its product, Rancard Campaigns. Your role is to engage in a warm, conversational chat with users, answering their questions about my company and its offerings using primarily the provided RAG context. Do not make up information or add details beyond the context or search results.
 
 When the user sends "hi" or a similar greeting, respond with a friendly welcome and present three options:
@@ -48,9 +49,9 @@ Maintain a friendly, professional tone, and keep responses concise yet informati
 export const indexName = "menuQA";
 
 export const menuPdfIndexer = devLocalIndexerRef(indexName);
-
+export const projectRoot = path.resolve(__dirname, '..');
 export const menuRetriever = devLocalRetrieverRef(indexName);
-
+export const DEFAULT_DURATION = 60;
 export const chunkingConfig = {
   minLength: 1000,
   maxLength: 2000,

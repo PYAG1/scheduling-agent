@@ -9,12 +9,10 @@ import {
   SearchToolOutputSchema,
 } from "../lib/schemas";
 import { DateTime } from "luxon";
+import { DEFAULT_DURATION } from "../constants";
+import { findAvailableSlots } from "../lib/helpers";
 
-interface GoogleCalendarEvent {
-  start?: { dateTime?: string | null; date?: string | null };
-  end?: { dateTime?: string | null; date?: string | null };
-  summary?: string | null;
-}
+
 
 interface EventDetails {
   summary: string;
@@ -25,7 +23,7 @@ interface EventDetails {
 }
 
 const CALENDAR_ID = process.env.CALENDAR_ID;
-const DEFAULT_DURATION = 60;
+
 
 export const getUserSchedule = ai.defineTool(
   {
@@ -230,53 +228,4 @@ export const searchTool = ai.defineTool(
   }
 );
 
-// Optimized helper function to find available time slots by finding gaps between events
-function findAvailableSlots({
-  events,
-  duration,
-  timeMin,
-  timeMax,
-  workingHours,
-}: {
-  events: GoogleCalendarEvent[];
-  duration: number;
-  timeMin: DateTime;
-  timeMax: DateTime;
-  workingHours: { start: number; end: number };
-}) {
-  const availableSlots: DateTime[] = [];
-  const sortedEvents = events
-    .map((event) => ({
-      start: DateTime.fromISO(event.start?.dateTime ?? event.start?.date ?? ""),
-      end: DateTime.fromISO(event.end?.dateTime ?? event.end?.date ?? ""),
-    }))
-    .sort((a, b) => a.start.toMillis() - b.start.toMillis());
 
-  let currentTime = timeMin.startOf("day").plus({ hours: workingHours.start });
-
-  while (currentTime < timeMax) {
-    const dayEnd = currentTime.endOf("day").set({ hour: workingHours.end });
-
-    // Find the next event that overlaps with the current time
-    const nextEvent = sortedEvents.find((event) => event.start > currentTime);
-
-    let slotEnd = nextEvent ? nextEvent.start : dayEnd;
-
-    // Check if there's enough time for the meeting
-    if (slotEnd.diff(currentTime, "minutes").minutes >= duration) {
-      availableSlots.push(currentTime);
-    }
-
-    // Move to the end of the next event or the end of the day
-    currentTime = nextEvent ? nextEvent.end : dayEnd;
-
-    // If we've reached the end of the day, move to the next day
-    if (currentTime >= dayEnd) {
-      currentTime = currentTime
-        .plus({ days: 1 })
-        .set({ hour: workingHours.start });
-    }
-  }
-
-  return availableSlots;
-}

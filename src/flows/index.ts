@@ -3,14 +3,18 @@ import { z } from "genkit";
 import { Document } from "genkit/retriever";
 import { chunk } from "llm-chunk";
 import * as path from "path";
-import { chunkingConfig, menuPdfIndexer, menuRetriever, rancardAgentPrompt } from "../constants";
+import {
+  AGENT_PROMPT,
+  chunkingConfig,
+  menuPdfIndexer,
+  menuRetriever,
+} from "../constants";
 import { ai, JsonSessionStore } from "../lib";
 import { getUserSchedule, scheduleMeetingTool, searchTool } from "../tools";
-import {
-  extractTextFromPdf,
-  file,
-} from "../utils/pdfUtils";
-
+import { extractTextFromPdf, file } from "../utils/pdfUtils";
+import { text } from "stream/consumers";
+import { AgentInputSchema, AgentOutputSchema } from "../lib/schemas";
+import { extractChatHistory } from "../lib/helpers";
 
 export const indexMenu = ai.defineFlow(
   {
@@ -44,14 +48,11 @@ export const indexMenu = ai.defineFlow(
   }
 );
 
-export const rancardAgentFlow = ai.defineFlow(
-  { 
-    name: "rancardAgent", 
-    inputSchema: z.object({
-      message: z.string(),
-      sessionId: z.string().optional()
-    }),
-    outputSchema: z.string() 
+export const mainAgentFlow = ai.defineFlow(
+  {
+    name: "rancardAgent",
+    inputSchema: AgentInputSchema,
+    outputSchema: AgentOutputSchema,
   },
   async ({ message, sessionId }) => {
     try {
@@ -60,9 +61,9 @@ export const rancardAgentFlow = ai.defineFlow(
         query: message,
         options: { k: 3 },
       });
-      
+
       const store = new JsonSessionStore();
-      
+
       // Try to load existing session or create a new one
       let session;
       if (sessionId) {
@@ -75,11 +76,11 @@ export const rancardAgentFlow = ai.defineFlow(
       } else {
         session = ai.createSession({ store });
       }
-      
+
       const chat = session.chat({
         store,
         model: gemini20Flash,
-        system: rancardAgentPrompt,
+        system: AGENT_PROMPT,
         tools: [getUserSchedule, searchTool, scheduleMeetingTool],
         docs,
       });
@@ -87,10 +88,18 @@ export const rancardAgentFlow = ai.defineFlow(
       const messageContent = `User Input: ${message}`;
       const response = await chat.send(messageContent);
 
-      return response.text;
+      return {
+        text: response.text,
+        usedTools: response.toolRequests.map((tool) => tool.toolRequest.name),
+        chatHistory: extractChatHistory(response?.messages),
+      };
     } catch (error) {
       console.error("Error in rancardAgentFlow:", error);
-      return "I'm sorry, I encountered an error processing your request. Please try again.";
+      return {
+        text: "I'm sorry, I encountered an error processing your request. Please try again.",
+        usedTools: [],
+        chatHistory: [],
+      };
     }
   }
 );

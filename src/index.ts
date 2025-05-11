@@ -1,7 +1,8 @@
 import { Hono } from 'hono';
 import { logger } from 'hono/logger';
-import { rancardAgentFlow } from './flows';
+
 import { v4 as uuidv4 } from 'uuid'; 
+import { mainAgentFlow } from './flows';
 
 const app = new Hono();
 app.use(logger());
@@ -22,7 +23,7 @@ app.post('/chat', async (c) => {
    
     const activeSessionId = sessionId ?? uuidv4();
     
-    const response = await rancardAgentFlow({
+    const response = await mainAgentFlow({
       message: prompt, 
       sessionId: activeSessionId
     });

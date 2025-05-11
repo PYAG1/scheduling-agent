@@ -66,3 +66,23 @@ export const ScheduleMeetingOutputSchema = z.object({
   status: z.string().describe("Status of the meeting scheduling operation"),
   message: z.string().optional().describe("Additional message regarding the operation"),
 });
+
+export const chatMessageSchema = z.object({
+  role: z.enum(["model", "user"]),
+  content: z.string(),
+});
+
+export const AgentInputSchema=  z.object({
+      message: z.string(),
+      sessionId: z.string().optional()
+    })
+
+  export const AgentOutputSchema = z.object({
+          text: z.string(),
+          usedTools: z.array(z.string()),
+         chatHistory: z.array(z.object({
+            role: z.enum(["model", "user"]),
+            content: z.string(),
+         })),
+  })  
+export type ChatMessage = z.infer<typeof chatMessageSchema>;
