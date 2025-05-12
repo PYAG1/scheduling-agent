@@ -56,15 +56,18 @@ export const mainAgentFlow = ai.defineFlow(
 
       // Try to load existing session or create a new one
       let session;
+      let activeSessionId = sessionId;
       if (sessionId) {
         try {
           session = await ai.loadSession(sessionId, { store });
         } catch (error) {
           console.error("Failed to load session, creating new one:", error);
           session = ai.createSession({ store });
+          activeSessionId = session.id
         }
       } else {
         session = ai.createSession({ store });
+        activeSessionId = session.id
       }
 
       const chat = session.chat({
@@ -83,7 +86,7 @@ export const mainAgentFlow = ai.defineFlow(
         text: response.text,
         usedTools: response.toolRequests.map((tool) => tool.toolRequest.name),
         chatHistory: extractChatHistory(response?.messages),
-        activeSessionId: sessionId ?? "",
+        activeSessionId: activeSessionId ?? "", 
       };
     } catch (error) {
       console.error("Error in rancardAgentFlow:", error);
