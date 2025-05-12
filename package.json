@@ -1,7 +1,9 @@
 {
   "name": "campaigns-agent",
   "scripts": {
-    "dev": "bun run --hot src/index.ts"
+    "dev": "bun run --hot src/index.ts",
+    "format": "prettier --write \"src/**/*.ts\"",
+  "format:check": "prettier --check \"src/**/*.ts\""
   },
   "dependencies": {
     "@genkit-ai/dev-local-vectorstore": "^1.8.0",
@@ -12,10 +14,12 @@
     "google-auth-library": "^9.15.1",
     "googleapis": "^148.0.0",
     "hono": "^4.7.8",
+    "install": "^0.13.0",
     "llm-chunk": "^0.0.1",
     "luxon": "^3.6.1",
     "pdf-parse": "^1.1.1",
     "pdf.js-extract": "^0.2.1",
+    "prettier": "^3.5.3",
     "uuid": "^11.1.0",
     "zod": "^3.24.4"
   },

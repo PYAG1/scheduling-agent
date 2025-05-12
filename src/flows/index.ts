@@ -3,18 +3,12 @@ import { z } from "genkit";
 import { Document } from "genkit/retriever";
 import { chunk } from "llm-chunk";
 import * as path from "path";
-import {
-  AGENT_PROMPT,
-  chunkingConfig,
-  menuPdfIndexer,
-  menuRetriever,
-} from "../constants";
+import { AGENT_PROMPT, chunkingConfig, menuPdfIndexer, menuRetriever } from "../constants";
 import { ai, JsonSessionStore } from "../lib";
+import { extractChatHistory } from "../lib/helpers";
+import { AgentInputSchema, AgentOutputSchema } from "../lib/schemas";
 import { getUserSchedule, scheduleMeetingTool, searchTool } from "../tools";
 import { extractTextFromPdf, file } from "../utils/pdfUtils";
-import { text } from "stream/consumers";
-import { AgentInputSchema, AgentOutputSchema } from "../lib/schemas";
-import { extractChatHistory } from "../lib/helpers";
 
 export const indexMenu = ai.defineFlow(
   {
@@ -26,14 +20,10 @@ export const indexMenu = ai.defineFlow(
     let filePath = path.resolve(file);
 
     // Read the pdf.
-    const pdfTxt = await ai.run("extract-text", () =>
-      extractTextFromPdf(filePath)
-    );
+    const pdfTxt = await ai.run("extract-text", () => extractTextFromPdf(filePath));
 
     // Divide the pdf text into segments.
-    const chunks = await ai.run("chunk-it", async () =>
-      chunk(pdfTxt, chunkingConfig)
-    );
+    const chunks = await ai.run("chunk-it", async () => chunk(pdfTxt, chunkingConfig));
 
     // Convert chunks of text into documents to store in the index.
     const documents = chunks.map((text) => {
@@ -45,7 +35,7 @@ export const indexMenu = ai.defineFlow(
       indexer: menuPdfIndexer,
       documents,
     });
-  }
+  },
 );
 
 export const mainAgentFlow = ai.defineFlow(
@@ -70,7 +60,7 @@ export const mainAgentFlow = ai.defineFlow(
         try {
           session = await ai.loadSession(sessionId, { store });
         } catch (error) {
-          console.log("Failed to load session, creating new one");
+          console.error("Failed to load session, creating new one:", error);
           session = ai.createSession({ store });
         }
       } else {
@@ -81,17 +71,19 @@ export const mainAgentFlow = ai.defineFlow(
         store,
         model: gemini20Flash,
         system: AGENT_PROMPT,
+        returnToolRequests: true,
         tools: [getUserSchedule, searchTool, scheduleMeetingTool],
         docs,
       });
 
       const messageContent = `User Input: ${message}`;
       const response = await chat.send(messageContent);
-
+      console.log(response?.toolRequests);
       return {
         text: response.text,
         usedTools: response.toolRequests.map((tool) => tool.toolRequest.name),
         chatHistory: extractChatHistory(response?.messages),
+        activeSessionId: sessionId ?? "",
       };
     } catch (error) {
       console.error("Error in rancardAgentFlow:", error);
@@ -99,7 +91,8 @@ export const mainAgentFlow = ai.defineFlow(
         text: "I'm sorry, I encountered an error processing your request. Please try again.",
         usedTools: [],
         chatHistory: [],
+        activeSessionId: sessionId ?? "",
       };
     }
-  }
+  },
 );

@@ -4,26 +4,17 @@ export const SearchToolInputSchema = z.object({
   query: z
     .string()
     .min(1)
-    .describe(
-      "The search query provided by the user to find relevant information"
-    ),
+    .describe("The search query provided by the user to find relevant information"),
 });
 
 export const SearchToolOutputSchema = z.object({
   summary: z
     .string()
-    .describe(
-      "A concise summary of the search results tailored to assist in the user chat"
-    ),
+    .describe("A concise summary of the search results tailored to assist in the user chat"),
 });
 
 export const InputSchema = z.object({
-  duration: z
-    .number()
-    .min(15)
-    .optional()
-    .default(60)
-    .describe("Meeting duration in minutes"),
+  duration: z.number().min(15).optional().default(60).describe("Meeting duration in minutes"),
   workingHours: z
     .object({
       start: z.number().min(0).max(23),
@@ -34,29 +25,23 @@ export const InputSchema = z.object({
 });
 
 export const OutputSchema = z.object({
-  recommendedTime: z
-    .string()
-    .datetime()
-    .describe("Recommended meeting time in ISO format"),
-  alternativeTimes: z
-    .array(z.string().datetime())
-    .describe("Alternative meeting times"),
+  recommendedTime: z.string().datetime().describe("Recommended meeting time in ISO format"),
+  alternativeTimes: z.array(z.string().datetime()).describe("Alternative meeting times"),
   busyPeriods: z
     .array(
       z.object({
         start: z.string().datetime(),
         end: z.string().datetime(),
-      })
+      }),
     )
     .describe("User's busy periods"),
 });
-
 
 export const MeetingSchema = z.object({
   summary: z.string().min(1, "Summary cannot be empty"),
   description: z.string().optional(),
   start: z.string().datetime({ message: "Invalid start date-time format" }),
-  end: z.string().datetime({ message: "Invalid end date-time format" }),
+  end: z.string().datetime({ message: "Invalid end date-time format" }).optional(),
   attendees: z.array(z.string().email({ message: "Invalid email format in attendees" })).optional(),
 });
 
@@ -72,17 +57,20 @@ export const chatMessageSchema = z.object({
   content: z.string(),
 });
 
-export const AgentInputSchema=  z.object({
-      message: z.string(),
-      sessionId: z.string().optional()
-    })
+export const AgentInputSchema = z.object({
+  message: z.string(),
+  sessionId: z.string().optional(),
+});
 
-  export const AgentOutputSchema = z.object({
-          text: z.string(),
-          usedTools: z.array(z.string()),
-         chatHistory: z.array(z.object({
-            role: z.enum(["model", "user"]),
-            content: z.string(),
-         })),
-  })  
+export const AgentOutputSchema = z.object({
+  text: z.string(),
+  usedTools: z.array(z.string()),
+  activeSessionId: z.string(),
+  chatHistory: z.array(
+    z.object({
+      role: z.enum(["model", "user"]),
+      content: z.string(),
+    }),
+  ),
+});
 export type ChatMessage = z.infer<typeof chatMessageSchema>;

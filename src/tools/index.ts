@@ -12,8 +12,6 @@ import { DateTime } from "luxon";
 import { DEFAULT_DURATION } from "../constants";
 import { findAvailableSlots } from "../lib/helpers";
 
-
-
 interface EventDetails {
   summary: string;
   description?: string;
@@ -23,7 +21,6 @@ interface EventDetails {
 }
 
 const CALENDAR_ID = process.env.CALENDAR_ID;
-
 
 export const getUserSchedule = ai.defineTool(
   {
@@ -59,10 +56,8 @@ export const getUserSchedule = ai.defineTool(
         workingHours,
       });
 
-      // Select best slot and alternatives
       const [recommendedTime, ...alternativeTimes] = availableSlots.slice(0, 4);
 
-      // Format busy periods
       const busyPeriods = events.map((event) => ({
         start: event.start?.dateTime ?? event.start?.date ?? "",
         end: event.end?.dateTime ?? event.end?.date ?? "",
@@ -81,18 +76,15 @@ export const getUserSchedule = ai.defineTool(
       };
     } catch (error: any) {
       console.error("Error in getUserSchedule:", error);
-      if (axios.isAxiosError(error)) {
-        throw new Error(
-          `API error: ${error.response?.data?.message || error.message}`
-        );
-      }
-      throw new Error(
-        `Failed to fetch schedule: ${error.message || String(error)}`
-      );
+      return {
+        recommendedTime: DateTime.now().plus({ days: 1 }).toISO(),
+        alternativeTimes: [],
+        busyPeriods: [],
+        message: "Unable to fetch schedule. Please suggest a preferred time.",
+      };
     }
-  }
+  },
 );
-
 export const scheduleMeetingTool = ai.defineTool(
   {
     name: "scheduleMeeting",
@@ -105,27 +97,20 @@ export const scheduleMeetingTool = ai.defineTool(
     try {
       const calendar = await getCalendarService();
 
-      // Validate start and end times
       const start = DateTime.fromISO(input.start);
-      let end = input.end
-        ? DateTime.fromISO(input.end)
-        : start.plus({ minutes: DEFAULT_DURATION });
+      let end = input.end ? DateTime.fromISO(input.end) : start.plus({ minutes: DEFAULT_DURATION });
 
-      if (!start.isValid || !end.isValid) {
-        throw new Error("Invalid start or end time format");
+      if (!start.isValid) {
+        throw new Error("Invalid start time format");
       }
-      if (start >= end) {
-        throw new Error("Start time must be before end time");
+      if (!end.isValid || start >= end) {
+        end = start.plus({ minutes: DEFAULT_DURATION });
       }
 
       if (input.attendees) {
-        const invalidEmails = input.attendees.filter(
-          (email) => !/^\S+@\S+\.\S+$/.test(email)
-        );
+        const invalidEmails = input.attendees.filter((email) => !/^\S+@\S+\.\S+$/.test(email));
         if (invalidEmails.length > 0) {
-          throw new Error(
-            `Invalid attendee email(s): ${invalidEmails.join(", ")}`
-          );
+          throw new Error(`Invalid attendee email(s): ${invalidEmails.join(", ")}`);
         }
       }
 
@@ -150,16 +135,18 @@ export const scheduleMeetingTool = ai.defineTool(
           status: "success",
           message: `Meeting "${eventResponse.data.summary}" scheduled successfully.`,
         };
-      } else {
-        throw new Error("Failed to create event, no data returned from API.");
       }
+      throw new Error("Failed to create event, no data returned from API.");
     } catch (error: any) {
       console.error("Error scheduling meeting:", error);
-      throw new Error(`Failed to schedule meeting: ${error.message}`);
+      // Provide a user-friendly fallback
+      return {
+        status: "error",
+        message: "Failed to schedule meeting. Please try again or contact campaigns@rancard.com.",
+      };
     }
-  }
+  },
 );
-
 
 export const searchTool = ai.defineTool(
   {
@@ -173,20 +160,16 @@ export const searchTool = ai.defineTool(
     try {
       const query = input.query.trim();
       if (!query) {
-        throw new Error("Search query cannot be empty or just whitespace");
+        return { summary: "No search query provided. Please clarify your request." };
       }
 
-      // Perform the search using Google Custom Search API
-      const response = await axios.get(
-        "https://www.googleapis.com/customsearch/v1",
-        {
-          params: {
-            key: process.env.JSON_SEARCH_API_KEY,
-            cx: process.env.JSON_SEARCH_ENGINE_ID,
-            q: query,
-          },
-        }
-      );
+      const response = await axios.get("https://www.googleapis.com/customsearch/v1", {
+        params: {
+          key: process.env.JSON_SEARCH_API_KEY,
+          cx: process.env.JSON_SEARCH_ENGINE_ID,
+          q: query,
+        },
+      });
 
       const items = response.data.items ?? [];
       if (items.length === 0) {
@@ -194,10 +177,7 @@ export const searchTool = ai.defineTool(
       }
 
       const searchContent = items
-        .map(
-          (item: { title: string; snippet: string }) =>
-            `${item.title}: ${item.snippet}`
-        )
+        .map((item: { title: string; snippet: string }) => `${item.title}: ${item.snippet}`)
         .join("\n");
 
       const { text } = await ai.generate({
@@ -216,16 +196,7 @@ export const searchTool = ai.defineTool(
       return { summary: text };
     } catch (error: any) {
       console.error("Error in searchTool:", error);
-      if (axios.isAxiosError(error)) {
-        throw new Error(
-          `API error: ${error.response?.data?.error?.message || error.message}`
-        );
-      }
-      throw new Error(
-        `Search and summarize failed: ${error.message || String(error)}`
-      );
+      return { summary: "Unable to fetch search results. Please try again or clarify your query." };
     }
-  }
+  },
 );
-
-

@@ -12,29 +12,31 @@ interface GoogleCalendarEvent {
  * @param messages The messages array from a chat response
  * @returns An array of filtered chat messages (only user and model roles)
  */
-export function extractChatHistory(messages?: Array<{role: string, content: any}>): ChatMessage[] {
+export function extractChatHistory(
+  messages?: Array<{ role: string; content: any }>,
+): ChatMessage[] {
   if (!messages) return [];
-  
+
   return messages
-    .filter(message => message.role === "user" || message.role === "model")
-    .map(message => ({
+    .filter((message) => message.role === "user" || message.role === "model")
+    .map((message) => ({
       role: message.role as "user" | "model",
-      content: Array.isArray(message.content) && message.content[0]?.text 
-        ? message.content[0].text 
-        : typeof message.content === "string" 
-          ? message.content 
-          : ""
+      content:
+        Array.isArray(message.content) && message.content[0]?.text
+          ? message.content[0].text
+          : typeof message.content === "string"
+            ? message.content
+            : "",
     }));
 }
-
 
 // Optimized helper function to find available time slots by finding gaps between events
 /**
  * Finds available time slots for meetings within a given date range and working hours.
- * 
+ *
  * This function analyzes calendar events and returns a list of DateTime objects representing
  * the start times of available meeting slots that fit the specified duration.
- * 
+ *
  * @param {Object} options - The options object.
  * @param {GoogleCalendarEvent[]} options.events - List of existing calendar events to consider.
  * @param {number} options.duration - The required meeting duration in minutes.
@@ -86,9 +88,7 @@ export function findAvailableSlots({
 
     // If we've reached the end of the day, move to the next day
     if (currentTime >= dayEnd) {
-      currentTime = currentTime
-        .plus({ days: 1 })
-        .set({ hour: workingHours.start });
+      currentTime = currentTime.plus({ days: 1 }).set({ hour: workingHours.start });
     }
   }
 

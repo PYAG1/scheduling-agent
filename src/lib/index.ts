@@ -1,11 +1,11 @@
 import { devLocalVectorstore } from "@genkit-ai/dev-local-vectorstore";
 import { gemini20Flash, googleAI, textEmbedding004 } from "@genkit-ai/googleai";
-import { readFile, writeFile } from "fs/promises";
+import { readFile, writeFile, mkdir } from "fs/promises";
 import { genkit, SessionData, SessionStore } from "genkit/beta";
-
 import { JWT } from "google-auth-library";
 import { google } from "googleapis";
-import { indexName } from "../constants";
+import * as path from "path";
+import { indexName, projectRoot } from "../constants";
 export const ai = genkit({
   plugins: [
     googleAI({
@@ -20,7 +20,6 @@ export const ai = genkit({
   ],
   model: gemini20Flash,
 });
-
 
 const SCOPES = ["https://www.googleapis.com/auth/calendar"];
 let authClient: JWT | null = null;
@@ -46,21 +45,38 @@ async function getAuthClient(): Promise<JWT> {
   }
 }
 
-
 export class JsonSessionStore<S> implements SessionStore<S> {
+  private readonly sessionsDir: string;
+
+  constructor() {
+    this.sessionsDir = path.join(projectRoot, "sessions");
+  }
+
   async get(sessionId: string): Promise<SessionData<S> | undefined> {
     try {
-      const s = await readFile(`${sessionId}.json`, { encoding: 'utf8' });
-      const data = JSON.parse(s);
-      return data;
-    } catch {
+      const filePath = path.join(this.sessionsDir, `${sessionId}.json`);
+      const s = await readFile(filePath, { encoding: "utf8" });
+      return JSON.parse(s);
+    } catch (error) {
+      console.debug(
+        `Failed to load session ${sessionId}:`,
+        error instanceof Error ? error.message : "Unknown error",
+      );
       return undefined;
     }
   }
 
   async save(sessionId: string, sessionData: SessionData<S>): Promise<void> {
-    const s = JSON.stringify(sessionData);
-    await writeFile(`${sessionId}.json`, s, { encoding: 'utf8' });
+    try {
+      await mkdir(this.sessionsDir, { recursive: true });
+
+      const filePath = path.join(this.sessionsDir, `${sessionId}.json`);
+      const s = JSON.stringify(sessionData);
+      await writeFile(filePath, s, { encoding: "utf8" });
+    } catch (error) {
+      console.error(`Failed to save session ${sessionId}:`, error);
+      throw error;
+    }
   }
 }
 
