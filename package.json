@@ -3,11 +3,12 @@
   "scripts": {
     "dev": "bun run --hot src/index.ts",
     "format": "prettier --write \"src/**/*.ts\"",
-  "format:check": "prettier --check \"src/**/*.ts\""
+    "format:check": "prettier --check \"src/**/*.ts\""
   },
   "dependencies": {
     "@genkit-ai/dev-local-vectorstore": "^1.8.0",
     "@genkit-ai/googleai": "^1.8.0",
+    "@googleapis/calendar": "^9.8.0",
     "@types/luxon": "^3.6.2",
     "axios": "^1.9.0",
     "genkit": "^1.8.0",
@@ -17,6 +18,7 @@
     "install": "^0.13.0",
     "llm-chunk": "^0.0.1",
     "luxon": "^3.6.1",
+    "mongodb": "6.16",
     "pdf-parse": "^1.1.1",
     "pdf.js-extract": "^0.2.1",
     "prettier": "^3.5.3",

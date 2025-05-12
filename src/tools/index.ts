@@ -123,6 +123,7 @@ export const scheduleMeetingTool = ai.defineTool(
       };
 
       const eventResponse = await calendar.events.insert({
+        
         calendarId: CALENDAR_ID,
         requestBody: eventDetails,
         sendNotifications: true,

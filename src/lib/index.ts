@@ -1,11 +1,44 @@
 import { devLocalVectorstore } from "@genkit-ai/dev-local-vectorstore";
 import { gemini20Flash, googleAI, textEmbedding004 } from "@genkit-ai/googleai";
-import { readFile, writeFile, mkdir } from "fs/promises";
+import { mkdir, readFile, writeFile } from "fs/promises";
 import { genkit, SessionData, SessionStore } from "genkit/beta";
 import { JWT } from "google-auth-library";
 import { google } from "googleapis";
 import * as path from "path";
 import { indexName, projectRoot } from "../constants";
+
+import { Collection, Db, MongoClient } from "mongodb";
+
+const uri = process.env.MONGO_DB_URI;
+if (!uri) {
+  throw new Error("MONGO_DB_URI environment variable is not set.");
+}
+
+let client: MongoClient | null = null;
+
+export async function getMongoClient(): Promise<MongoClient> {
+  if (!client) {
+    console.log("Attempting to connect to MongoDB...");
+    client = new MongoClient(uri as string, {
+      serverApi: {
+        version: "1",
+        strict: true,
+        deprecationErrors: true,
+      },
+    });
+    await client.connect();
+    console.log("Connected to MongoDB successfully!");
+  } else {
+    console.log("Reusing existing MongoDB connection.");
+  }
+  return client;
+}
+
+export async function getSessionsCollection() {
+  const client = await getMongoClient();
+  const db = client.db("campaignsAgentDB");
+  return db.collection("sessions");
+}
 export const ai = genkit({
   plugins: [
     googleAI({
@@ -21,6 +54,45 @@ export const ai = genkit({
   model: gemini20Flash,
 });
 
+export class MongoSessionStore<S> implements SessionStore<S> {
+  private db: Db;
+  private collection: Collection;
+  private readonly dbName: string;
+  private readonly collectionName: string;
+
+  constructor(dbName: string, collectionName: string) {
+    this.db = null as unknown as Db;
+    this.collection = null as unknown as Collection;
+    this.dbName = dbName;
+    this.collectionName = collectionName;
+  }
+
+  async connect() {
+    const client = await getMongoClient();
+    this.db = client.db(this.dbName);
+    this.collection = this.db.collection(this.collectionName);
+  }
+
+  async get(sessionId: string): Promise<SessionData<S> | undefined> {
+    const session = await this.collection.findOne({ sessionId });
+    if (!session) return undefined;
+
+    return {
+      id: sessionId,
+      state: session.state,
+      threads: session.threads,
+    } as SessionData<S>;
+  }
+
+  async save(sessionId: string, sessionData: SessionData<S>): Promise<void> {
+    await this.collection.updateOne(
+      { sessionId },
+      { $set: sessionData },
+      { upsert: true },
+    );
+  }
+}
+
 const SCOPES = ["https://www.googleapis.com/auth/calendar"];
 let authClient: JWT | null = null;
 
@@ -34,6 +106,7 @@ async function getAuthClient(): Promise<JWT> {
       email: process.env.GOOGLE_CLIENT_EMAIL,
       key: process.env.GOOGLE_PRIVATE_KEY,
       scopes: SCOPES,
+      
     });
 
     const tokens = await authClient.authorize();

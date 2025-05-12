@@ -4,11 +4,12 @@ import { Document } from "genkit/retriever";
 import { chunk } from "llm-chunk";
 import * as path from "path";
 import { AGENT_PROMPT, chunkingConfig, menuPdfIndexer, menuRetriever } from "../constants";
-import { ai, JsonSessionStore } from "../lib";
+import { ai, MongoSessionStore } from "../lib";
 import { extractChatHistory } from "../lib/helpers";
 import { AgentInputSchema, AgentOutputSchema } from "../lib/schemas";
 import { getUserSchedule, scheduleMeetingTool, searchTool } from "../tools";
 import { extractTextFromPdf, file } from "../utils/pdfUtils";
+
 
 export const indexMenu = ai.defineFlow(
   {
@@ -52,9 +53,12 @@ export const mainAgentFlow = ai.defineFlow(
         options: { k: 3 },
       });
 
-      const store = new JsonSessionStore();
+      const store = new MongoSessionStore(
+        "AgentDB",
+        "sessions"
+      );
+      await store.connect();
 
-      // Try to load existing session or create a new one
       let session;
       let activeSessionId = sessionId;
       if (sessionId) {
@@ -63,30 +67,32 @@ export const mainAgentFlow = ai.defineFlow(
         } catch (error) {
           console.error("Failed to load session, creating new one:", error);
           session = ai.createSession({ store });
-          activeSessionId = session.id
+          activeSessionId = session.id;
         }
       } else {
         session = ai.createSession({ store });
-        activeSessionId = session.id
+        activeSessionId = session.id;
       }
 
       const chat = session.chat({
         store,
         model: gemini20Flash,
         system: AGENT_PROMPT,
-        returnToolRequests: true,
         tools: [getUserSchedule, searchTool, scheduleMeetingTool],
         docs,
       });
 
       const messageContent = `User Input: ${message}`;
       const response = await chat.send(messageContent);
-      console.log(response?.toolRequests);
+      console.log(response?.toolRequests, "toolRequests");
+
+   
+
       return {
         text: response.text,
         usedTools: response.toolRequests.map((tool) => tool.toolRequest.name),
         chatHistory: extractChatHistory(response?.messages),
-        activeSessionId: activeSessionId ?? "", 
+        activeSessionId: activeSessionId ?? "",
       };
     } catch (error) {
       console.error("Error in rancardAgentFlow:", error);
@@ -97,5 +103,5 @@ export const mainAgentFlow = ai.defineFlow(
         activeSessionId: sessionId ?? "",
       };
     }
-  },
+  }
 );
