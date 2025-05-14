@@ -35,6 +35,38 @@ The application integrates with several powerful tools and services to enhance f
   - **Purpose**: Prepares meeting details and triggers email notifications rather than direct calendar additions.
   - **Details**: Validates input (e.g., valid email addresses) but sends confirmation emails instead of adding to calendar due to domain-wide delegation restrictions that require user consent.
   - **Note**: Direct calendar additions are blocked because Google Service Account authentication provides server-to-server auth but calendar operations require domain-wide delegation or user consent.
+## Guide Demo
+
+**Step 1**
+Make a request to the agent. When a greeting is sent the agent responds with a menu. But in this case the agent was asked to directly book a demo. The agent responds to the users request by providing available periods for the meeting.
+
+![step 1](https://github.com/PYAG1/scheduling-agent/blob/main/src/assets/step1.png)
+
+**Step 2**
+The agent is able to provide this response to the user by utilizing the **getUserSchedule** tool. The user makes a request using the tool as shown in the screenshot.
+
+![step 2](https://github.com/PYAG1/scheduling-agent/blob/main/src/assets/step2.png)
+
+**Step 3**
+ The **getUserSchedule** tool is configured to look for available periods in my google calendar is provide a recommended time ,an alternative time and busy periods during the week. 
+ 
+ ![step 2](https://github.com/PYAG1/scheduling-agent/blob/main/src/assets/step3.png)
+
+ **Step 4**
+ Using the response from the **getUserSchedule** tool the agent presents the recommened time as well as the alternative time for the user to select from.
+ 
+ ![step 2](https://github.com/PYAG1/scheduling-agent/blob/main/src/assets/step4.png)
+
+ **Step 5**
+ The user responds to the agent providing it with their detail.(email and phone number). The agent uses the time selected by the user as well as the user information and calls the **scheduleMeeting** tool.
+ 
+ ![step 2](https://github.com/PYAG1/scheduling-agent/blob/main/src/assets/step5.png)
+
+ **Step 6**
+ The agent successfully books the meeting using  the **scheduleMeeting** tool by sending an email to me and the user.
+ 
+ ![step 2](https://github.com/PYAG1/scheduling-agent/blob/main/src/assets/step6.png)
+
 
 ## Branch Structure
 
