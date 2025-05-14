@@ -1,3 +1,4 @@
+import { DateTime } from "luxon";
 import { z } from "zod";
 
 export const SearchToolInputSchema = z.object({
@@ -43,6 +44,7 @@ export const MeetingSchema = z.object({
   start: z.string().datetime({ message: "Invalid start date-time format" }),
   end: z.string().datetime({ message: "Invalid end date-time format" }).optional(),
   attendees: z.array(z.string().email({ message: "Invalid email format in attendees" })).optional(),
+  phoneNumber: z.string().optional(),
 });
 
 export const ScheduleMeetingOutputSchema = z.object({
@@ -73,4 +75,15 @@ export const AgentOutputSchema = z.object({
     }),
   ),
 });
+
+export const MeetingInputSchema = z.object({
+  summary: z.string().min(1, "Summary is required."),
+  start: z.string().refine((val) => DateTime.fromISO(val).isValid, {
+    message: "Invalid start time format.",
+  }),
+  end: z.string().optional(),
+  attendees: z.array(z.string().email()).optional(),
+  phoneNumber: z.string().optional(),
+});
+
 export type ChatMessage = z.infer<typeof chatMessageSchema>;

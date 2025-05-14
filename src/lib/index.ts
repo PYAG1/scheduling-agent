@@ -4,15 +4,17 @@ import { mkdir, readFile, writeFile } from "fs/promises";
 import { genkit, SessionData, SessionStore } from "genkit/beta";
 import { JWT } from "google-auth-library";
 import { google } from "googleapis";
+import { Collection, Db, MongoClient } from "mongodb";
 import * as path from "path";
 import { indexName, projectRoot } from "../constants";
+import { cleanEnv, str } from "envalid";
 
-import { Collection, Db, MongoClient } from "mongodb";
+const env = cleanEnv(process.env, {
+  MONGO_DB_URI: str(),
+  GOOGLE_API_KEY: str(),
+});
 
-const uri = process.env.MONGO_DB_URI;
-if (!uri) {
-  throw new Error("MONGO_DB_URI environment variable is not set.");
-}
+const uri = env.MONGO_DB_URI;
 
 let client: MongoClient | null = null;
 
@@ -39,10 +41,11 @@ export async function getSessionsCollection() {
   const db = client.db("campaignsAgentDB");
   return db.collection("sessions");
 }
+
 export const ai = genkit({
   plugins: [
     googleAI({
-      apiKey: "YOUR_API_KEY",
+      apiKey: env.GOOGLE_API_KEY,
     }),
     devLocalVectorstore([
       {

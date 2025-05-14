@@ -6,7 +6,7 @@ The Campaigns Agent is a server-side application for a conversational agent usin
 
 ## Features
 
-- **AI-Powered Chat Endpoint**: Processes user prompts and generates responses using the `rancardAgentFlow`, leveraging document retrieval and external tools.
+- **AI-Powered Chat Endpoint**: Processes user prompts and generates responses using the `savannahAgentFlow`, leveraging document retrieval and external tools.
 - **Logging**: Employs Hono’s logger middleware to track requests and responses.
 - **Health Check Endpoint**: Offers a simple `GET /` endpoint to confirm the service is operational.
 
@@ -23,17 +23,17 @@ The application integrates with several powerful tools and services to enhance f
 - **getUserSchedule Tool**:
   - **Purpose**: Retrieves a user’s Google Calendar events and suggests optimal meeting times based on availability within a 7-day window.
   - **Details**: Uses the Google Calendar API to list events, then calculates available slots considering working hours (default: 9 AM to 5 PM) and a specified duration (default: 60 minutes). Returns a recommended time and up to three alternatives.
-  - **Integration**: Called within `rancardAgentFlow` to assist users in scheduling by providing available time slots.
+  - **Integration**: Called within `savannahAgentFlow` to assist users in scheduling by providing available time slots.
 
 - **scheduleMeetingTool**:
   - **Purpose**: Books a meeting in Google Calendar with details like summary, description, start/end times, and attendees.
   - **Details**: Validates input (e.g., start time before end time, valid email addresses for attendees) and uses the Google Calendar API to create an event, returning an event ID and a link to the event.
-  - **Integration**: Invoked in `rancardAgentFlow` to finalize meeting bookings once a time is selected.
+  - **Integration**: Invoked in `savannahAgentFlow` to finalize meeting bookings once a time is selected.
 
 - **searchTool**:
   - **Purpose**: Searches the internet via the Google Custom Search JSON API and summarizes results to answer user queries.
   - **Details**: Takes a query, fetches search results, and uses AI to generate a concise, conversational summary (2-3 sentences) tailored to the user’s intent.
-  - **Integration**: Employed in `rancardAgentFlow` to provide answers requiring information beyond the indexed PDF.
+  - **Integration**: Employed in `savannahAgentFlow` to provide answers requiring information beyond the indexed PDF.
 
 ## Requirements
 
@@ -128,8 +128,8 @@ Send a POST request to `/chat`:
 
 ### Searching for Information
 
-- **User**: "Tell me about Rancard’s suitability for marketing campaigns."
-- **Assistant**: "Based on a quick search, Rancard offers robust tools for targeted marketing campaigns, with a focus on mobile engagement and data-driven insights, making it suitable for businesses aiming to reach diverse audiences efficiently."
+- **User**: "Tell me about Savannah Intelligence's suitability for marketing campaigns."
+- **Assistant**: "Based on a quick search, Savannah Intelligence offers robust tools for targeted marketing campaigns, with a focus on mobile engagement and data-driven insights, making it suitable for businesses aiming to reach diverse audiences efficiently."
 
 ## Project Structure
 
@@ -138,7 +138,7 @@ Send a POST request to `/chat`:
 ├── src/
 │   ├── index.ts          # Application entry point (Hono server setup)
 │   ├── constants/        # Static files (e.g., PDF) and configuration constants
-│   ├── flows/            # AI workflows (indexMenu, rancardAgentFlow)
+│   ├── flows/            # AI workflows (indexMenu, savannahAgentFlow)
 │   ├── lib/              # Shared utilities (AI config, session store, calendar service)
 │   ├── tools/            # Tool implementations (getUserSchedule, scheduleMeetingTool, searchTool)
 │   ├── utils/            # Helper functions (e.g., PDF text extraction)
@@ -151,7 +151,7 @@ Send a POST request to `/chat`:
 ### Key Components
 
 - **`indexMenu` Flow**: Indexes a PDF by extracting text, chunking it, converting chunks to documents, and storing them in a local vector store.
-- **`rancardAgentFlow` Flow**: Handles user queries by retrieving relevant documents, creating a chat session with the `gemini20Flash` model, and using tools to generate responses.
+- **`savannahAgentFlow` Flow**: Handles user queries by retrieving relevant documents, creating a chat session with the `gemini20Flash` model, and using tools to generate responses.
 - **AI Configuration**: Uses Genkit with Google AI’s `gemini20Flash` model and `textEmbedding004` for embeddings.
 
 ## Additional Resources

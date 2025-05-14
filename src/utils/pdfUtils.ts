@@ -1,10 +1,12 @@
+import { indexMenu } from "../flows";
 import * as fs from "fs";
 import * as path from "path";
 import { PDFExtract } from "pdf.js-extract";
 import { projectRoot } from "../constants";
 
-const constantsDir = path.join(projectRoot, "src/constants");
-const pdfFileName = "7a6ab7f1-7c29-4e8b-bdfa-57b4edbef9cb.pdf";
+
+const constantsDir = path.join(projectRoot, "/constants");
+const pdfFileName = "52910294-516c-4779-8d11-818db1a42928.pdf";
 export const file = path.join(constantsDir, pdfFileName);
 
 export async function extractTextFromPdf(filePath: string) {
@@ -22,7 +24,7 @@ export async function extractTextFromPdf(filePath: string) {
     }
 
     const pdfExtract = new PDFExtract();
-    const options = {}; // default options
+    const options = {}; 
 
     const data = await pdfExtract.extract(pdfFile, options);
 
@@ -53,33 +55,31 @@ export async function extractTextFromPdf(filePath: string) {
   }
 }
 
-// export async function indexPredefinedMenu() {
-//   try {
-//     console.log(`Indexing predefined menu from: ${file}`);
-//     console.log(`(Full path: ${path.resolve(file)})`);
+export async function indexPredefinedMenu() {
+  try {
+    console.log(`Indexing predefined menu from: ${file}`);
+    console.log(`(Full path: ${path.resolve(file)})`);
 
-//     // Check if the constants directory exists
-//     if (!fs.existsSync(constantsDir)) {
-//       console.log(`Creating constants directory at: ${constantsDir}`);
-//       fs.mkdirSync(constantsDir, { recursive: true });
-//       console.error(`Please place your PDF file at: ${file}`);
-//       throw new Error(`Constants directory created, but PDF file not found. Please add the PDF.`);
-//     }
+    // Check if the constants directory exists
+    if (!fs.existsSync(constantsDir)) {
+      console.log(`Creating constants directory at: ${constantsDir}`);
+      fs.mkdirSync(constantsDir, { recursive: true });
+      console.error(`Please place your PDF file at: ${file}`);
+      throw new Error(`Constants directory created, but PDF file not found. Please add the PDF.`);
+    }
 
-//     // Check if the PDF file exists
-//     if (!fs.existsSync(file)) {
-//       console.error(`PDF file not found at: ${file}`);
-//       throw new Error(`PDF file not found. Please add the PDF to the constants directory.`);
-//     }
 
-//     await indexMenu(file);
-//     console.log('Menu indexing completed');
-//   } catch (error) {
-//     console.error('Failed to index menu:', error);
-//     throw error;
-//   }
-// }
+    if (!fs.existsSync(file)) {
+      console.error(`PDF file not found at: ${file}`);
+      throw new Error(`PDF file not found. Please add the PDF to the constants directory.`);
+    }
 
-// indexPredefinedMenu().catch(err => {
-//   console.error('Failed to index menu:', err);
-// });
+    await indexMenu(file);
+    console.log('Menu indexing completed');
+  } catch (error) {
+    console.error('Failed to index menu:', error);
+    throw error;
+  }
+}
+
+

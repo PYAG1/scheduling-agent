@@ -41,7 +41,7 @@ export const indexMenu = ai.defineFlow(
 
 export const mainAgentFlow = ai.defineFlow(
   {
-    name: "rancardAgent",
+    name: "savannahAgentFlow",
     inputSchema: AgentInputSchema,
     outputSchema: AgentOutputSchema,
   },
@@ -95,7 +95,7 @@ export const mainAgentFlow = ai.defineFlow(
         activeSessionId: activeSessionId ?? "",
       };
     } catch (error) {
-      console.error("Error in rancardAgentFlow:", error);
+      console.error("Error in AgentFlow:", error);
       return {
         text: "I'm sorry, I encountered an error processing your request. Please try again.",
         usedTools: [],
