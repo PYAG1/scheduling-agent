@@ -69,10 +69,12 @@ export const AgentOutputSchema = z.object({
   usedTools: z.array(z.string()),
   activeSessionId: z.string(),
   chatHistory: z.array(
+    //to see full message content comment this and uncomment z.any()
     z.object({
       role: z.enum(["model", "user"]),
       content: z.string(),
     }),
+    // z.any(),
   ),
 });
 

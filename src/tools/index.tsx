@@ -14,7 +14,7 @@ import { DEFAULT_DURATION } from "../constants";
 import { findAvailableSlots } from "../lib/helpers";
 import { EmailTemplate } from "../templates/email-notification-template";
 import { AdminEmailTemplate } from "../templates/admin-notification-template";
-
+//TODO:Refactor code 
 const CALENDAR_ID = process.env.CALENDAR_ID;
 
 export const getUserSchedule = ai.defineTool(

@@ -21,7 +21,7 @@ let client: MongoClient | null = null;
 export async function getMongoClient(): Promise<MongoClient> {
   if (!client) {
     console.log("Attempting to connect to MongoDB...");
-    client = new MongoClient(uri as string, {
+    client = new MongoClient(uri, {
       serverApi: {
         version: "1",
         strict: true,

@@ -90,8 +90,8 @@ export const mainAgentFlow = ai.defineFlow(
 
       return {
         text: response.text,
-        usedTools: response.toolRequests.map((tool) => tool.toolRequest.name),
-        chatHistory: extractChatHistory(response?.messages),
+        usedTools: response.toolRequests.map((tool) => tool.toolRequest.name), //shows in responses when returnToolRequests is true
+        chatHistory: extractChatHistory(response?.messages),//to view full message content remove extractChatHistory helper and uncomment z.any()  in schemas.ts
         activeSessionId: activeSessionId ?? "",
       };
     } catch (error) {
