@@ -1,10 +1,21 @@
 import { Hono } from "hono";
 import { logger } from "hono/logger";
-
 import { mainAgentFlow } from "./flows";
+import { getMongoClient } from "./lib";
+import { indexPredefinedMenu } from "./utils/pdfUtils";
 
 const app = new Hono();
 app.use(logger());
+
+(async () => {
+  try {
+    await getMongoClient();
+    await indexPredefinedMenu(); //handles indexing the menu
+  } catch (error) {
+    console.error("Failed to connect to MongoDB and index failed during server startup:", error);
+    process.exit(1); 
+  }
+})();
 
 app.post("/chat", async (c) => {
   try {
@@ -18,7 +29,6 @@ app.post("/chat", async (c) => {
         400,
       );
     }
-
 
     const response = await mainAgentFlow({
       message: prompt,
@@ -42,8 +52,20 @@ app.post("/chat", async (c) => {
   }
 });
 
+
+
 app.get("/", (c) => {
   return c.text("Hello Hono!");
 });
+
+async function shutdown() {
+  const client = await getMongoClient();
+  await client.close();
+  console.log("MongoDB connection closed.");
+  process.exit(0);
+}
+
+process.on("SIGINT", shutdown);
+process.on("SIGTERM", shutdown);
 
 export default app;

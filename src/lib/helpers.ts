@@ -1,6 +1,7 @@
 import { z } from "genkit";
 import { ChatMessage } from "./schemas";
 import { DateTime } from "luxon";
+import moment from "moment";
 interface GoogleCalendarEvent {
   start?: { dateTime?: string | null; date?: string | null };
   end?: { dateTime?: string | null; date?: string | null };
@@ -94,3 +95,12 @@ export function findAvailableSlots({
 
   return availableSlots;
 }
+
+
+export   const formatDateTime = (isoString: string) => {
+    try {
+      return moment(isoString).format('dddd, MMMM D, YYYY [at] h:mm a');
+    } catch {
+      return isoString;
+    }
+  };

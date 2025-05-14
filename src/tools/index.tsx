@@ -1,5 +1,6 @@
 import axios from "axios";
 import { ai, getCalendarService } from "../lib";
+import { Resend } from "resend";
 import {
   InputSchema,
   MeetingSchema,
@@ -11,14 +12,8 @@ import {
 import { DateTime } from "luxon";
 import { DEFAULT_DURATION } from "../constants";
 import { findAvailableSlots } from "../lib/helpers";
-
-interface EventDetails {
-  summary: string;
-  description?: string;
-  start: { dateTime: string };
-  end: { dateTime: string };
-  attendees?: { email: string }[];
-}
+import { EmailTemplate } from "../templates/email-notification-template";
+import { AdminEmailTemplate } from "../templates/admin-notification-template";
 
 const CALENDAR_ID = process.env.CALENDAR_ID;
 
@@ -47,7 +42,10 @@ export const getUserSchedule = ai.defineTool(
 
       const events = eventsResponse.data.items || [];
 
-      const workingHours = input.workingHours || { start: 9, end: 17 };
+      const workingHours = {
+        start: input.workingHours?.start ?? 9,
+        end: input.workingHours?.end ?? 17,
+      };
       const availableSlots = findAvailableSlots({
         events,
         duration: input.duration || DEFAULT_DURATION,
@@ -65,12 +63,12 @@ export const getUserSchedule = ai.defineTool(
 
       const validAlternativeTimes = alternativeTimes
         .filter((slot) => slot.isValid)
-        .map((slot) => slot.toISO()!);
+        .map((slot) => slot.toISO());
 
       return {
         recommendedTime: recommendedTime?.isValid
-          ? recommendedTime.toISO()!
-          : DateTime.fromISO(timeMin).toISO()!,
+          ? recommendedTime.toISO()
+          : DateTime.fromISO(timeMin).toISO(),
         alternativeTimes: validAlternativeTimes,
         busyPeriods,
       };
@@ -85,64 +83,149 @@ export const getUserSchedule = ai.defineTool(
     }
   },
 );
+
 export const scheduleMeetingTool = ai.defineTool(
   {
     name: "scheduleMeeting",
     description:
-      "Schedules a meeting in Google Calendar based on provided details like summary, description, start time, optional end time, and attendees.",
+      "Schedules a meeting by sending email notifications with meeting details including summary, description, start time, attendees, and phone number.",
     inputSchema: MeetingSchema,
     outputSchema: ScheduleMeetingOutputSchema,
   },
   async (input) => {
     try {
-      const calendar = await getCalendarService();
+      console.log("ScheduleMeeting: Starting scheduling process", {
+        summary: input.summary,
+        attendeesCount: input.attendees?.length || 0,
+        startTime: input.start,
+      });
 
       const start = DateTime.fromISO(input.start);
       let end = input.end ? DateTime.fromISO(input.end) : start.plus({ minutes: DEFAULT_DURATION });
 
       if (!start.isValid) {
+        console.error("ScheduleMeeting: Invalid start time format", { startInput: input.start });
         throw new Error("Invalid start time format");
       }
       if (!end.isValid || start >= end) {
+        console.log("ScheduleMeeting: Adjusting end time", {
+          endBefore: input.end,
+          endAfter: start.plus({ minutes: DEFAULT_DURATION }).toISO(),
+        });
         end = start.plus({ minutes: DEFAULT_DURATION });
       }
 
       if (input.attendees) {
         const invalidEmails = input.attendees.filter((email) => !/^\S+@\S+\.\S+$/.test(email));
         if (invalidEmails.length > 0) {
+          console.error("ScheduleMeeting: Invalid attendee emails detected", { invalidEmails });
           throw new Error(`Invalid attendee email(s): ${invalidEmails.join(", ")}`);
         }
       }
 
-      const eventDetails: EventDetails = {
-        summary: input.summary,
-        description: input.description,
-        start: { dateTime: start.toISO() },
-        end: { dateTime: end.toISO() },
-        attendees: input.attendees?.map((email) => ({ email })),
-      };
+      console.log("ScheduleMeeting: Initializing Resend client");
+      const resend = new Resend(process.env.RESEND_API_KEY);
+      if (!process.env.RESEND_API_KEY) {
+        console.error("ScheduleMeeting: Missing Resend API key");
+      }
 
-      const eventResponse = await calendar.events.insert({
-        calendarId: CALENDAR_ID,
-        requestBody: eventDetails,
-        sendNotifications: true,
+      // Default recipient if no attendees specified
+      const recipients = input.attendees?.length ? input.attendees : ["gyekyeyaw3@gmail.com"];
+
+      console.log("ScheduleMeeting: Recipients determined", { recipients });
+
+      // Extract a name for the first recipient for personalization
+      const firstName = recipients[0].split("@")[0].replace(/[^a-zA-Z]/g, "");
+      const capitalizedFirstName = firstName.charAt(0).toUpperCase() + firstName.slice(1);
+
+      console.log("ScheduleMeeting: Email template props", {
+        firstName: capitalizedFirstName,
+        meetingSummary: input.summary,
+        meetingDescription: input.description,
+        startTime: start.toISO() || "",
+        endTime: end.toISO() || "",
+        attendees: input.attendees,
+        phoneNumber: input.phoneNumber,
       });
 
-      if (eventResponse.data) {
-        return {
-          eventId: eventResponse.data.id ?? undefined,
-          htmlLink: eventResponse.data.htmlLink ?? undefined,
-          status: "success",
-          message: `Meeting "${eventResponse.data.summary}" scheduled successfully.`,
-        };
+      // Admin email (always sent to you)
+      console.log("ScheduleMeeting: Sending admin notification email");
+      try {
+        const adminEmailResult = await resend.emails.send({
+          from: "pyag@mail.frimps.xyz",
+          to: ["gyekyeyaw3@gmail.com"],
+          subject: `New Demo Request: ${input.summary}`,
+          react: (
+            <AdminEmailTemplate
+              meetingSummary={input.summary}
+              meetingDescription={input.description}
+              startTime={start.toISO() || ""}
+              endTime={end.toISO() || ""}
+              attendees={input.attendees}
+              phoneNumber={input.phoneNumber}
+              firstName={capitalizedFirstName}
+            />
+          ),
+        });
+        console.log("Admin email sent successfully", { adminEmailId: adminEmailResult.data?.id });
+      } catch (adminEmailError) {
+        console.log("Failed to send admin email", { error: adminEmailError });
       }
-      throw new Error("Failed to create event, no data returned from API.");
+
+      console.log("ScheduleMeeting: Sending attendee notification email");
+      try {
+        const { data, error } = await resend.emails.send({
+          from: "pyag@mail.frimps.xyz",
+          to: recipients,
+          subject: `Meeting Confirmation: ${input.summary}`,
+          react: (
+            <EmailTemplate
+              firstName={capitalizedFirstName}
+              meetingSummary={input.summary}
+              meetingDescription={input.description}
+              startTime={start.toISO() || ""}
+              endTime={end.toISO() || ""}
+              attendees={input.attendees}
+            />
+          ),
+        });
+
+        console.log("ScheduleMeeting: Attendee email response", {
+          data,
+          error,
+          responseData: JSON.stringify(data),
+        });
+
+        if (error) {
+          console.error("ScheduleMeeting: Failed to send meeting invitation", { error });
+          throw new Error(`Failed to send meeting invitation: ${error.message}`);
+        }
+
+        console.log("ScheduleMeeting: Meeting scheduled successfully", {
+          emailId: data?.id,
+          recipients,
+        });
+        return {
+          eventId: data?.id,
+          status: "success",
+          message: `Meeting for "${input.summary}" scheduled successfully! A confirmation has been sent to ${recipients.join(", ")}.`,
+        };
+      } catch (emailError) {
+        console.error("ScheduleMeeting: Error sending attendee email", {
+          error: emailError,
+          message: emailError.message,
+          stack: emailError.stack,
+        });
+        throw emailError;
+      }
     } catch (error: any) {
-      console.error("Error scheduling meeting:", error);
-      // Provide a user-friendly fallback
+      console.error("ScheduleMeeting: Error scheduling meeting", {
+        errorMessage: error.message,
+        stack: error.stack,
+      });
       return {
         status: "error",
-        message: "Failed to schedule meeting. Please try again or contact campaigns@rancard.com.",
+        message: "Failed to schedule meeting. Please try again or contact info@savannahintelligence.com.",
       };
     }
   },
