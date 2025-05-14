@@ -67,6 +67,11 @@ The agent is able to provide this response to the user by utilizing the **getUse
  
  ![step 2](https://github.com/PYAG1/scheduling-agent/blob/main/src/assets/step6.png)
 
+ **Fin⛳**
+Confirmation screenshot
+
+![fin](https://github.com/PYAG1/scheduling-agent/blob/main/src/assets/booking_success.jpg)
+
 
 ## Branch Structure
 
